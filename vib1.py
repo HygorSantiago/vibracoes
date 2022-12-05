@@ -3,7 +3,9 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-	
+import sympy
+from numpy import sqrt,sin,cos,exp
+
 m = 1.
 c = 1.
 k = 100.
@@ -15,6 +17,7 @@ w = 5.
 f = 10.
 fi = 0.
 ff = 2.
+forca = 't'
 
 def calculos(m,c,k,ti,tf,x0,v0,w,f):
 	wn = (k/m)**0.5
@@ -128,7 +131,49 @@ def calculos(m,c,k,ti,tf,x0,v0,w,f):
 	fig4,ax4 = plt.subplots()
 	ax4.plot(freq,fase)
 	
+	
 	return wn,psi,wd,cc,A,theta,t,x1,x2,xh,fig1,r,Ay,phi,xp,x,fig2,rpico,freq,frf,fig3,fase,fig4
+	
+def laplace(forca,ti,tf,m,c,k):
+	
+
+	s = sympy.var('s')
+	t = sympy.var('t')
+
+	freq = np.linspace(ti,tf,1000)
+	
+	Fs = sympy.laplace_transform(forca, t, s, noconds=True) 
+	ft = sympy.inverse_laplace_transform(Fs,s,t)
+	ftd = [ft.subs({t:i}) for i in freq]
+	ftd = np.array(ftd)
+
+	Gs = (1/(m*(s**2)+c*s+k))
+	Gs = sympy.nsimplify(Gs)
+	gt = sympy.inverse_laplace_transform(Gs,s,t)
+	gtd = [gt.subs({t:i}) for i in freq]
+	gtd = np.array(gtd)
+	
+	ho = (1/(m*(s**2)+c*s+k))*Fs
+
+	Hs = Gs*Fs
+	Hs = Hs.apart(s)
+	ht = sympy.inverse_laplace_transform(Hs,s,t)
+
+	htd = []
+	for i in freq:
+		h2 = ht.subs({t:i})
+		h2 = str(h2)
+		h2 = eval(h2)
+		htd.append(h2)
+	
+	fig,ax=plt.subplots()
+	ax.plot(freq,htd,label='Resposta do sistema')
+	ax.set_xlabel('Tempo [s]')
+	ax.set_ylabel('Deslocamento [m]')
+	ax.set_title('Resposta para forças de excitação')
+
+
+	return Fs,ft,ftd,Gs,gt,gtd,Hs,ht,htd,fig,ho
 	
 def acao1(m,c,k,ti,tf,x0,v0,w,f):
 
@@ -232,6 +277,36 @@ def acao3(m,c,k,ti,tf,x0,v0,w,f):
 	
 	st.pyplot(fig4)
 	
+def acao4(m,c,k,ti,tf,x0,v0,w,f,forca):
+	
+	wn,psi,wd,cc,A,theta,t,x1,x2,xh,fig1,r,Ay,phi,xp,x,fig2,rpico,freq,frf,fig3,fase,fig4 = calculos(m,c,k,ti,tf,x0,v0,w,f)
+	
+	Fs,ft,ftd,Gs,gt,gtd,Hs,ht,htd,fig,ho = laplace(forca,ti,tf,m,c,k)
+	
+	st.write('O sistema pode ser excitado por forças de diferentes formatos. Quando periódicos as equações diferenciais podem ser calculados, porém essa solução é muito complexa para outros sistemas. Uma abordagem é pela Transformada de Laplace onde o sistema é formado por uma entrada (h(t)), uma saída (f(t)) e uma função de transferência (g(t)) da seguinte forma:')
+	
+	st.latex(r'h(t)=g(t)\cdot f(t)')
+	
+	st.write('Onde g(t) é a função de transferência e f(t) a força aplicada.')
+	
+	st.latex(r'g(t)=\frac{1}{\frac{d^2x(t)}{dt^2}.m + \frac{dx(t)}{dt}.c + x(t).k}')
+	st.latex(f'f(t) = {forca}')
+	
+	st.write('Aplicando a Transformada de Laplace:')
+	
+	st.latex(f'H(s)=G(s) \cdot F(s)')
+	
+	st.write('Com F(s), G(s) e H(s) assumindo respectivamente os seguintes valores:')
+	st.write(Fs)
+	st.latex(r'G(s)=\frac{1}{m.s^2+c.s+k}')
+	st.write(ho)
+	
+	st.write('Fazendo a transformada inversa de H(s) para h(t) temos:')
+	st.write(ht)
+
+	st.write('Graficamente a solução é:')
+	st.pyplot(fig)	
+	
 st.title('Vibração à excitação harmônica 1GDL')
 
 st.write('Este trabalho aborda conceitos de vibrações de 1 GDL modelado segundo as seguintes equações:')
@@ -298,3 +373,13 @@ ff = st.number_input(label='Insira a frequência final de exibição [rad/s].',
 	
 if botao3:
 	acao3(m,c,k,ti,tf,x0,v0,w,f)
+
+
+with st.form('form4'):
+	botao4 = st.form_submit_button(label='Calcular')
+	
+forca = st.text_input(label='Insira a força aplicada em função de t.',
+				     value='t')
+				     
+if botao4:
+	acao4(m,c,k,ti,tf,x0,v0,w,f,forca)
